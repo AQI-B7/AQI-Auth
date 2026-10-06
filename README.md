@@ -1,3 +1,4 @@
+### AQI AUTH 
 # Standalone Auth Service (Clerk-style)
 
 Production-ready **Authentication & Identity Service**.
