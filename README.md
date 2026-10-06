@@ -1,5 +1,7 @@
 # AQI-Auth
 
+![AQI-Auth Banner](https://raw.githubusercontent.com/AQI-B7/AQI-Auth/main/Banner%20Image%20Auth.jpg)
+
 <p align="center">
   <img src="https://img.shields.io/github/license/foxiboy07/AQI-Auth" alt="License" />
   <img src="https://img.shields.io/github/last-commit/foxiboy07/AQI-Auth" alt="Last Commit" />
@@ -12,9 +14,9 @@
   <img src="https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white" alt="Redis 7" />
 </p>
 
-A production-ready, standalone authentication and identity service designed as a direct alternative to Clerk-style auth platforms. AQI-Auth is built for multi-product ecosystems, internal platforms, SaaS applications, and enterprise-grade authorization workflows.
+A production-ready, standalone authentication and identity service designed as a direct alternative to Clerk-style auth platforms. AQI-Auth is built for multi-product ecosystems, internal platform[...]
 
-It provides secure authentication, session lifecycle management, tenant-aware access control, rate limiting, passwordless flows, SAML/SSO, passkeys, OAuth, webhooks, and a typed SDK for modern application integrations.
+It provides secure authentication, session lifecycle management, tenant-aware access control, rate limiting, passwordless flows, SAML/SSO, passkeys, OAuth, webhooks, and a typed SDK for modern app[...]
 
 ## Why AQI-Auth?
 
