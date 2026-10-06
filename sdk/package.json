@@ -1,0 +1,31 @@
+{
+  "name": "@standalone-auth/sdk",
+  "version": "0.1.0",
+  "description": "Typed TypeScript/JavaScript client for the Standalone Auth Service API. Works in Node and browsers.",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "sideEffects": false,
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "jest"
+  },
+  "peerDependencies": {
+    "@simplewebauthn/browser": "^13.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@simplewebauthn/browser": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@simplewebauthn/browser": "^13.1.0",
+    "@types/jest": "^29.5.0",
+    "@types/node": "^22.0.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.0",
+    "typescript": "^5.7.0"
+  },
+  "license": "MIT"
+}

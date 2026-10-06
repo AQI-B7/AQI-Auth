@@ -1,0 +1,468 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id          String       @id @default(cuid())
+  name        String
+  slug        String       @unique
+  status      TenantStatus @default(ACTIVE)
+  plan        String       @default("free")
+  metadata    Json?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  users       User[]
+  roles       Role[]
+  apiKeys     ApiKey[]
+  sessions    Session[]
+  invitations Invitation[]
+  webhooks    WebhookEndpoint[]
+  ssoConnections SsoConnection[]
+  scimTokens     ScimToken[]
+  domains        TenantDomain[]
+
+  @@map("tenants")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+model User {
+  id              String     @id @default(cuid())
+  tenantId        String
+  email           String
+  emailVerified   Boolean    @default(false)
+  passwordHash    String?
+  firstName       String?
+  lastName        String?
+  imageUrl        String?
+  status          UserStatus @default(ACTIVE)
+  bannedAt        DateTime?
+  banReason       String?
+  lastLoginAt     DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  tenant             Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  roles              UserRole[]
+  sessions           Session[]
+  refreshTokens      RefreshToken[]
+  passwordResets     PasswordResetToken[]
+  emailVerifications EmailVerificationToken[]
+  magicLinks         MagicLinkToken[]
+  twoFactor          TwoFactorSecret?
+  backupCodes        TwoFactorBackupCode[]
+  apiKeys            ApiKey[]
+  authEvents         AuthEvent[]
+  oauthAccounts      OAuthAccount[]
+  invitationsSent    Invitation[]             @relation("InvitedBy")
+  webauthnCredentials WebAuthnCredential[]
+
+  @@unique([tenantId, email])
+  @@index([email])
+  @@map("users")
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+  PENDING
+  BANNED
+}
+
+model OAuthAccount {
+  id                String   @id @default(cuid())
+  userId            String
+  provider          String
+  providerAccountId String
+  accessToken       String?
+  refreshToken      String?
+  expiresAt         DateTime?
+  tokenType         String?
+  scope             String?
+  idToken           String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("oauth_accounts")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  name        String
+  description String?
+  permissions String[]
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  tenant Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  users  UserRole[]
+
+  @@unique([tenantId, name])
+  @@map("roles")
+}
+
+model UserRole {
+  userId     String
+  roleId     String
+  assignedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model Invitation {
+  id          String           @id @default(cuid())
+  tenantId    String
+  email       String
+  roleId      String?
+  tokenHash   String           @unique
+  status      InvitationStatus @default(PENDING)
+  invitedById String?
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime         @default(now())
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invitedBy User?  @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([email])
+  @@map("invitations")
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
+model Session {
+  id         String    @id @default(cuid())
+  userId     String
+  tenantId   String
+  userAgent  String?
+  ipAddress  String?
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  lastActive DateTime  @default(now())
+  createdAt  DateTime  @default(now())
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
+
+  @@index([userId])
+  @@index([tenantId])
+  @@map("sessions")
+}
+
+model RefreshToken {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  userId     String
+  sessionId  String
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  replacedBy String?
+  createdAt  DateTime  @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_verification_tokens")
+}
+
+model MagicLinkToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  email     String
+  tenantId  String?
+  userId    String?
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@map("magic_link_tokens")
+}
+
+model TwoFactorSecret {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  secret    String
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("two_factor_secrets")
+}
+
+model TwoFactorBackupCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("two_factor_backup_codes")
+}
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  tenantId   String
+  userId     String?
+  name       String
+  keyHash    String    @unique
+  keyPrefix  String
+  scopes     String[]
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@map("api_keys")
+}
+
+model WebhookEndpoint {
+  id          String   @id @default(cuid())
+  tenantId    String
+  url         String
+  secret      String
+  description String?
+  events      String[]
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant     Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
+
+  @@index([tenantId])
+  @@map("webhook_endpoints")
+}
+
+model WebhookDelivery {
+  id             String                @id @default(cuid())
+  endpointId     String
+  eventType      String
+  eventId        String
+  payload        Json
+  status         WebhookDeliveryStatus @default(PENDING)
+  attempts       Int                   @default(0)
+  maxAttempts    Int                   @default(8)
+  responseStatus Int?
+  responseBody   String?
+  errorMessage   String?
+  nextAttemptAt  DateTime?
+  deliveredAt    DateTime?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([endpointId])
+  @@index([status])
+  @@index([eventId])
+  @@map("webhook_deliveries")
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  DELIVERING
+  SUCCEEDED
+  FAILED
+  DEAD_LETTERED
+}
+
+model AuthEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  tenantId  String?
+  type      String
+  ipAddress String?
+  userAgent String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([tenantId])
+  @@index([type])
+  @@map("auth_events")
+}
+
+// ── Passkeys / WebAuthn ─────────────────────────────────────
+model WebAuthnCredential {
+  id              String    @id @default(cuid())
+  userId          String
+  credentialId    String    @unique // base64url, from authenticator
+  publicKey       Bytes // COSE public key
+  counter         BigInt    @default(0) // signature counter, cloning detection
+  deviceType      String // 'singleDevice' | 'multiDevice'
+  backedUp        Boolean   @default(false)
+  transports      String[] // 'usb' | 'ble' | 'nfc' | 'internal' | 'hybrid'
+  aaguid          String?
+  name            String? // user-assigned label, e.g. "MacBook Touch ID"
+  lastUsedAt      DateTime?
+  createdAt       DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("webauthn_credentials")
+}
+
+/** Short-lived server-side state for an in-flight WebAuthn
+ *  registration/authentication ceremony (the "challenge"). Redis would
+ *  also work, but persisting here keeps ceremonies auditable and survives
+ *  a worker restart mid-ceremony without extra infra coupling. */
+model WebAuthnChallenge {
+  id        String   @id @default(cuid())
+  challenge String   @unique
+  userId    String? // null during a passwordless/discoverable-credential login attempt
+  type      String // 'registration' | 'authentication'
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("webauthn_challenges")
+}
+
+// ── SSO (SAML) ───────────────────────────────────────────────
+model SsoConnection {
+  id                   String    @id @default(cuid())
+  tenantId             String
+  name                 String // display name, e.g. "Okta"
+  entryPoint           String // IdP SSO URL (where we redirect the user)
+  issuer               String // IdP entity ID
+  cert                 String // IdP's X.509 signing certificate (PEM)
+  wantAssertionsSigned Boolean   @default(true)
+  signatureAlgorithm   String    @default("sha256")
+  active               Boolean   @default(true)
+  jitProvisioning      Boolean   @default(true)
+  defaultRoleId        String? // role assigned to JIT-provisioned users
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("sso_connections")
+}
+
+// ── SCIM provisioning ────────────────────────────────────────
+model ScimToken {
+  id         String    @id @default(cuid())
+  tenantId   String
+  tokenHash  String    @unique
+  name       String
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("scim_tokens")
+}
+
+// ── Verified domains (JIT auto-join) ───────────────────────────
+model TenantDomain {
+  id                 String    @id @default(cuid())
+  tenantId           String
+  domain             String    @unique // e.g. "acme.com" — globally unique, one tenant owns it
+  verified           Boolean   @default(false)
+  verificationToken  String // value to place in a DNS TXT record to prove ownership
+  verifiedAt         DateTime?
+  autoJoin           Boolean   @default(true) // new signups with this email domain join this tenant automatically
+  defaultRoleId      String? // role assigned on auto-join
+  createdAt          DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("tenant_domains")
+}
+
+// ── Impersonation (support tooling) ─────────────────────────
+// Tenant-scoped: an admin (permission `impersonate:*`) acting as another
+// member of the SAME tenant. This is not a cross-tenant platform-staff
+// plane — this codebase has no such concept, and one isn't invented here.
+model ImpersonationSession {
+  id            String    @id @default(cuid())
+  tenantId      String
+  actorUserId   String // the admin doing the impersonating
+  targetUserId  String // the user being impersonated
+  reason        String
+  tokenJti      String    @unique // jti of the issued impersonation access token
+  ipAddress     String?
+  userAgent     String?
+  startedAt     DateTime  @default(now())
+  endedAt       DateTime?
+  expiresAt     DateTime
+
+  @@index([tenantId])
+  @@index([actorUserId])
+  @@index([targetUserId])
+  @@map("impersonation_sessions")
+}
